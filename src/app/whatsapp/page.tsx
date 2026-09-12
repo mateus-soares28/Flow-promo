@@ -10,9 +10,12 @@ import {
 
 // Reutilizando os componentes que separamos na etapa anterior
 import { SidebarItem } from '@/src/components/SidebarItem';
+import { AccountStatus } from '@/src/components/AccountStatus';
+import { useAccount } from '@/src/components/AccountContext';
 
 export default function WhatsAppConnectionPage() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const { whatsappConnected, connectWhatsApp, disconnectWhatsApp } = useAccount();
 
   return (
     <div className="min-h-screen bg-[#fafafa] flex font-sans text-gray-900">
@@ -69,15 +72,7 @@ export default function WhatsAppConnectionPage() {
               FlowPromos
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="flex items-center gap-2 px-3 py-1 bg-red-50 text-red-600 border border-red-100 rounded-full text-xs font-medium">
-              <div className="w-1.5 h-1.5 rounded-full bg-red-600"></div>
-              Desconectado
-            </span>
-            <span className="flex items-center gap-2 px-3 py-1 bg-gray-900 text-white rounded-full text-xs font-medium">
-              ⌛ 12 dias restantes
-            </span>
-          </div>
+          <AccountStatus />
         </header>
 
         {/* CONTEÚDO DA PÁGINA WHATSAPP */}
@@ -86,7 +81,7 @@ export default function WhatsAppConnectionPage() {
             
             {/* Cabeçalho da Página */}
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Conexão WhatsApp/Telegram</h1>
+              <h1 className="text-2xl font-bold text-gray-900">Conexão WhatsApp</h1>
               <p className="text-gray-500 mt-1">Conecte os canais por onde as ofertas são enviadas.</p>
               
               <button className="flex items-center gap-2 text-sm text-gray-600 font-medium mt-4 hover:text-gray-900 transition-colors">
@@ -107,10 +102,7 @@ export default function WhatsAppConnectionPage() {
                 <Smartphone size={18} />
                 WhatsApp
               </button>
-              <button className="flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-200 text-gray-500 rounded-xl font-medium hover:bg-gray-50 transition-colors">
-                <Send size={18} />
-                Telegram
-              </button>
+             
             </div>
 
             {/* Card Principal de Conexão */}
@@ -179,10 +171,18 @@ export default function WhatsAppConnectionPage() {
 
                 {/* Status e Logout */}
                 <div className="flex flex-col items-center gap-4 w-full sm:w-80">
-                  <div className="flex items-center gap-2 px-4 py-1.5 bg-red-50 text-red-600 rounded-full text-sm font-semibold border border-red-100">
+                  <div className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-semibold border ${whatsappConnected ? 'bg-green-50 text-green-700 border-green-100' : 'bg-red-50 text-red-600 border-red-100'}`}>
                     <X size={14} strokeWidth={3} />
-                    Desconectado
+                    {whatsappConnected ? 'Ativo' : 'Desconectado'}
                   </div>
+
+                  <button
+                    type="button"
+                    onClick={whatsappConnected ? disconnectWhatsApp : connectWhatsApp}
+                    className={`w-full px-4 py-3 rounded-xl font-medium transition-colors ${whatsappConnected ? 'bg-red-50 text-red-700 hover:bg-red-100' : 'bg-green-600 text-white hover:bg-green-700'}`}
+                  >
+                    {whatsappConnected ? 'Desconectar WhatsApp' : 'Confirmar conexão'}
+                  </button>
                   
                   <button className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gray-50 border border-gray-200 text-gray-700 rounded-xl font-medium hover:bg-gray-100 transition-colors">
                     <LogOut size={18} className="text-orange-600" />

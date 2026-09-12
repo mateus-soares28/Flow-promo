@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 
 import { SidebarItem } from '@/src/components/SidebarItem';
+import { AccountStatus } from '@/src/components/AccountStatus';
 
 export default function GruposPage() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -96,15 +97,7 @@ export default function GruposPage() {
               FlowPromos
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="flex items-center gap-2 px-3 py-1 bg-red-50 text-red-600 border border-red-100 rounded-full text-xs font-medium">
-              <div className="w-1.5 h-1.5 rounded-full bg-red-600"></div>
-              Desconectado
-            </span>
-            <span className="flex items-center gap-2 px-3 py-1 bg-gray-900 text-white rounded-full text-xs font-medium">
-              ⌛ 12 dias restantes
-            </span>
-          </div>
+          <AccountStatus />
         </header>
 
         {/* CONTEÚDO */}
