@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { 
   LayoutDashboard, PlayCircle, MessageSquare, Layers, Users, 
   Tag, Activity, Send, Ticket, MessageCircle, DollarSign, 
@@ -15,7 +17,51 @@ import { useAccount } from '@/src/components/AccountContext';
 
 export default function WhatsAppConnectionPage() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [connectionName, setConnectionName] = useState('');
+  const [showInstructions, setShowInstructions] = useState(false);
+  const [showBackupMessage, setShowBackupMessage] = useState(false);
+  const [qrCode, setQrCode] = useState<string | null>(null);
+  const [isGeneratingQr, setIsGeneratingQr] = useState(false);
+  const [feedback, setFeedback] = useState('');
+  const router = useRouter();
   const { whatsappConnected, connectWhatsApp, disconnectWhatsApp } = useAccount();
+
+  function saveConnectionName() {
+    const name = connectionName.trim();
+    if (!name) {
+      setFeedback('Digite um nome para salvar a conexão.');
+      return;
+    }
+
+    window.localStorage.setItem('flowpromos-whatsapp-name', name);
+    setFeedback('Nome da conexão salvo.');
+  }
+
+  async function generateQrCode() {
+    const instanceName = connectionName.trim();
+    if (!instanceName) {
+      setFeedback('Informe o nome da conexão antes de gerar o QR Code.');
+      return;
+    }
+
+    setIsGeneratingQr(true);
+    setFeedback('Solicitando um novo QR Code...');
+    try {
+      const response = await fetch('/api/whatsapp/qr', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ instanceName }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? 'Não foi possível gerar o QR Code.');
+      setQrCode(data.base64 ?? null);
+      setFeedback('QR Code gerado. Escaneie com o WhatsApp.');
+    } catch (error) {
+      setFeedback(error instanceof Error ? error.message : 'Não foi possível gerar o QR Code.');
+    } finally {
+      setIsGeneratingQr(false);
+    }
+  }
 
   return (
     <div className="min-h-screen bg-[#fafafa] flex font-sans text-gray-900">
@@ -84,21 +130,23 @@ export default function WhatsAppConnectionPage() {
               <h1 className="text-2xl font-bold text-gray-900">Conexão WhatsApp</h1>
               <p className="text-gray-500 mt-1">Conecte os canais por onde as ofertas são enviadas.</p>
               
-              <button className="flex items-center gap-2 text-sm text-gray-600 font-medium mt-4 hover:text-gray-900 transition-colors">
-                <Lightbulb size={16} className="text-yellow-500" />
+              <button type="button" onClick={() => setShowInstructions((current) => !current)} className="flex items-center gap-2 text-sm text-gray-600 font-medium mt-4 hover:text-gray-900 transition-colors">
+                <Lightbulb size={16} className="text-gray-700" />
                 Como funciona
               </button>
+              {showInstructions && <p className="mt-3 max-w-2xl rounded-lg border border-gray-200 bg-white p-4 text-sm text-gray-600">Digite um nome, gere o QR Code e leia o código usando a opção Dispositivos conectados do WhatsApp.</p>}
             </div>
 
             {/* Banner de Backup */}
-            <div className="w-full bg-gradient-to-r from-indigo-500 via-purple-500 to-teal-400 p-3 rounded-xl flex items-center justify-center gap-2 text-white font-medium shadow-sm cursor-pointer hover:opacity-95 transition-opacity">
+            <button type="button" onClick={() => setShowBackupMessage((current) => !current)} className="w-full bg-gray-900 p-3 rounded-xl flex items-center justify-center gap-2 text-white font-medium shadow-sm hover:bg-gray-800 transition-colors">
               <Signal size={18} />
               Configurar conexão de backup
-            </div>
+            </button>
+            {showBackupMessage && <p className="-mt-4 rounded-lg border border-gray-200 bg-white p-3 text-sm text-gray-600">A conexão de backup ficará disponível quando houver uma segunda instância configurada.</p>}
 
             {/* Tabs de Navegação */}
             <div className="flex items-center gap-4 pt-2">
-              <button className="flex items-center gap-2 px-5 py-2.5 bg-white border border-purple-300 text-purple-700 rounded-xl font-medium shadow-sm">
+              <button type="button" className="flex items-center gap-2 px-5 py-2.5 bg-gray-900 border border-gray-900 text-white rounded-xl font-medium shadow-sm">
                 <Smartphone size={18} />
                 WhatsApp
               </button>
@@ -126,12 +174,14 @@ export default function WhatsAppConnectionPage() {
                     <label className="text-sm font-medium text-gray-700">Nome da conexão (opcional)</label>
                     <input 
                       type="text" 
-                      defaultValue="conexao grupos"
-                      className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all text-gray-900"
+                      value={connectionName}
+                      onChange={(event) => setConnectionName(event.target.value)}
+                      placeholder="Digite o nome do seu grupo aqui"
+                      className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent transition-all text-gray-900"
                     />
                   </div>
-                  <button className="flex items-center gap-2 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors border border-gray-200">
-                    <Save size={18} className="text-purple-600" />
+                  <button type="button" onClick={saveConnectionName} className="flex items-center gap-2 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors border border-gray-200">
+                    <Save size={18} className="text-gray-700" />
                     Salvar
                   </button>
                 </div>
@@ -139,7 +189,7 @@ export default function WhatsAppConnectionPage() {
                 {/* Modo de Conexão */}
                 <div className="space-y-1.5 w-full">
                   <label className="text-sm font-medium text-gray-700">Modo de conexão</label>
-                  <select className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent appearance-none text-gray-900">
+                    <select className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent appearance-none text-gray-900">
                     <option>QR Code (Tradicional)</option>
                   </select>
                 </div>
@@ -149,11 +199,11 @@ export default function WhatsAppConnectionPage() {
               <div className="mt-10 flex flex-col items-center">
                 
                 {/* Placeholder do QR Code (Substitua pela imagem/gerador real depois) */}
-                <div className="w-64 h-64 bg-gray-50 border-2 border-dashed border-gray-300 rounded-xl flex items-center justify-center mb-6">
-                  <div className="text-center text-gray-400">
+                <div className="w-64 h-64 bg-gray-50 border-2 border-dashed border-gray-300 rounded-xl flex items-center justify-center mb-6 overflow-hidden">
+                  {qrCode ? <Image src={qrCode} alt="QR Code para conectar o WhatsApp" width={256} height={256} unoptimized className="w-full h-full object-contain" /> : <div className="text-center text-gray-400">
                     <QrCode size={48} className="mx-auto mb-2 opacity-50" />
-                    <span className="text-sm font-medium">QR Code aqui</span>
-                  </div>
+                    <span className="text-sm font-medium">Gere o QR Code para começar</span>
+                  </div>}
                 </div>
 
                 {/* Timer e Botão de Reiniciar */}
@@ -161,10 +211,11 @@ export default function WhatsAppConnectionPage() {
                   <p className="text-sm text-gray-500">
                     Se não conectar em 117s, um novo QR code será gerado automaticamente.
                   </p>
-                  <button className="flex items-center justify-center gap-2 px-6 py-2.5 bg-blue-50 text-blue-700 rounded-lg font-medium hover:bg-blue-100 transition-colors mx-auto text-sm w-full sm:w-auto">
+                  <button type="button" onClick={generateQrCode} disabled={isGeneratingQr} className="flex items-center justify-center gap-2 px-6 py-2.5 bg-gray-100 text-gray-900 rounded-lg font-medium hover:bg-gray-200 transition-colors mx-auto text-sm w-full sm:w-auto disabled:opacity-50">
                     <RefreshCw size={16} />
-                    Reiniciar conexão (gerar nova instância)
+                    {isGeneratingQr ? 'Gerando QR Code...' : 'Gerar novo QR Code'}
                   </button>
+                  {feedback && <p className="text-sm text-gray-600">{feedback}</p>}
                 </div>
 
                 <div className="w-full h-px bg-gray-100 my-8"></div>
@@ -184,8 +235,8 @@ export default function WhatsAppConnectionPage() {
                     {whatsappConnected ? 'Desconectar WhatsApp' : 'Confirmar conexão'}
                   </button>
                   
-                  <button className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gray-50 border border-gray-200 text-gray-700 rounded-xl font-medium hover:bg-gray-100 transition-colors">
-                    <LogOut size={18} className="text-orange-600" />
+                  <button type="button" onClick={() => { disconnectWhatsApp(); router.push('/'); }} className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gray-50 border border-gray-200 text-gray-700 rounded-xl font-medium hover:bg-gray-100 transition-colors">
+                    <LogOut size={18} className="text-gray-700" />
                     Logout / Voltar
                   </button>
                 </div>

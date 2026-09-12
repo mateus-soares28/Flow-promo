@@ -1,0 +1,49 @@
+services:
+  evolution-postgres:
+    image: postgres:16-alpine
+    container_name: smartpromos-evolution-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: evolution
+      POSTGRES_USER: evolution
+      POSTGRES_PASSWORD: evolution_local_password
+    volumes:
+      - evolution_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U evolution -d evolution"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  evolution-redis:
+    image: redis:7-alpine
+    container_name: smartpromos-evolution-redis
+    restart: unless-stopped
+    volumes:
+      - evolution_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  evolution-api:
+    image: evoapicloud/evolution-api:latest
+    container_name: smartpromos-evolution-api
+    restart: unless-stopped
+    depends_on:
+      evolution-postgres:
+        condition: service_healthy
+      evolution-redis:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env.evolution
+    volumes:
+      - evolution_instances:/evolution/instances
+
+volumes:
+  evolution_postgres_data:
+  evolution_redis_data:
+  evolution_instances:

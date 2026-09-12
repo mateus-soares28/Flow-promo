@@ -14,11 +14,13 @@ import { StatusCard } from '../components/StatusCard';
 import { TaskItem } from '../components/TaskItem';
 import { AccountStatus } from '../components/AccountStatus';
 import { useAccount } from '../components/AccountContext';
+import { useAuth } from '../components/AuthContext';
+import { LogoutButton } from '../components/LogoutButton';
 
 export default function DashboardPage() {
-  const userName = "Mateus";
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const router = useRouter();
+  const { user } = useAuth();
   const { whatsappConnected, plan, daysRemaining, expiresAt, isExpired, offersDetected, segmentsCount, groupsCount } = useAccount();
 
   useEffect(() => {
@@ -80,7 +82,10 @@ export default function DashboardPage() {
               FlowPromos
             </div>
           </div>
-          <AccountStatus />
+          <div className="flex items-center gap-3">
+            <AccountStatus />
+            <LogoutButton />
+          </div>
         </header>
 
         {/* CONTEÚDO */}
@@ -88,7 +93,7 @@ export default function DashboardPage() {
           <div className="max-w-6xl mx-auto space-y-8">
             
             <div>
-              <h1 className="text-3xl font-bold mb-2">Olá, {userName}</h1>
+              <h1 className="text-3xl font-bold mb-2">Olá, {user?.name ?? 'cliente'}</h1>
               <p className="text-gray-500">Aqui está o resumo da sua conta FlowPromos.</p>
             </div>
 
