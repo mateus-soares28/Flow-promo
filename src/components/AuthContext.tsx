@@ -1,85 +1,124 @@
 'use client';
 
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import type { User } from '@supabase/supabase-js';
+import { createSupabaseBrowserClient } from '@/src/lib/supabase/client';
 
-interface StoredUser {
+interface AppUser {
+  id: string;
   name: string;
   email: string;
-  password: string;
   planId: string;
 }
 
 interface AuthContextValue {
-  user: StoredUser | null;
+  user: AppUser | null;
+  isLoading: boolean;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => string | null;
-  signup: (name: string, email: string, password: string, planId: string, purchaseConfirmed: boolean) => string | null;
-  logout: () => void;
+  login: (email: string, password: string) => Promise<string | null>;
+  signup: (name: string, email: string, password: string, planId: string, purchaseConfirmed: boolean) => Promise<string | null>;
+  resetPassword: (email: string) => Promise<string | null>;
+  updatePassword: (password: string) => Promise<string | null>;
+  logout: () => Promise<void>;
 }
 
-const USERS_KEY = 'flowpromos-users';
-const SESSION_KEY = 'flowpromos-session';
-
-function readUsers(): StoredUser[] {
-  if (typeof window === 'undefined') return [];
-
-  try {
-    return JSON.parse(window.localStorage.getItem(USERS_KEY) ?? '[]') as StoredUser[];
-  } catch {
-    return [];
-  }
-}
-
-function readSession(): StoredUser | null {
-  if (typeof window === 'undefined') return null;
-
-  try {
-    const session = window.localStorage.getItem(SESSION_KEY);
-    return session ? (JSON.parse(session) as StoredUser) : null;
-  } catch {
-    return null;
-  }
+function toAppUser(user: User | null): AppUser | null {
+  if (!user?.email) return null;
+  return {
+    id: user.id,
+    email: user.email,
+    name: typeof user.user_metadata.full_name === 'string' ? user.user_metadata.full_name : user.email,
+    planId: typeof user.user_metadata.plan_id === 'string' ? user.user_metadata.plan_id : 'full',
+  };
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<StoredUser | null>(readSession);
+  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
+  const [user, setUser] = useState<AppUser | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  function login(email: string, password: string) {
-    const foundUser = readUsers().find(
-      (storedUser) => storedUser.email === email.trim().toLowerCase() && storedUser.password === password,
-    );
+  useEffect(() => {
+    let active = true;
 
-    if (!foundUser) return 'E-mail ou senha inválidos.';
+    supabase.auth.getUser().then(({ data }) => {
+      if (!active) return;
+      setUser(toAppUser(data.user));
+      setIsLoading(false);
+    });
 
-    window.localStorage.setItem(SESSION_KEY, JSON.stringify(foundUser));
-    setUser(foundUser);
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(toAppUser(session?.user ?? null));
+      setIsLoading(false);
+    });
+
+    return () => {
+      active = false;
+      listener.subscription.unsubscribe();
+    };
+  }, [supabase]);
+
+  async function login(email: string, password: string) {
+    const { error } = await supabase.auth.signInWithPassword({
+      email: email.trim().toLowerCase(),
+      password,
+    });
+
+    if (error) return 'E-mail ou senha invalidos.';
     return null;
   }
 
-  function signup(name: string, email: string, password: string, planId: string, purchaseConfirmed: boolean) {
+  async function signup(name: string, email: string, password: string, planId: string, purchaseConfirmed: boolean) {
     if (!purchaseConfirmed) return 'Confirme a compra do plano para liberar o acesso.';
     if (name.trim().length < 2) return 'Informe seu nome completo.';
     if (password.length < 6) return 'A senha deve ter pelo menos 6 caracteres.';
 
     const normalizedEmail = email.trim().toLowerCase();
-    if (!normalizedEmail.includes('@')) return 'Informe um e-mail válido.';
-    if (readUsers().some((storedUser) => storedUser.email === normalizedEmail)) return 'Este e-mail já possui cadastro.';
+    if (!normalizedEmail.includes('@')) return 'Informe um e-mail valido.';
 
-    const newUser = { name: name.trim(), email: normalizedEmail, password, planId };
-    window.localStorage.setItem(USERS_KEY, JSON.stringify([...readUsers(), newUser]));
-    window.localStorage.setItem(SESSION_KEY, JSON.stringify(newUser));
-    setUser(newUser);
+    const { error } = await supabase.auth.signUp({
+      email: normalizedEmail,
+      password,
+      options: {
+        data: {
+          full_name: name.trim(),
+          plan_id: planId,
+        },
+      },
+    });
+
+    if (error) return error.message.includes('already registered') ? 'Este e-mail ja possui cadastro.' : error.message;
     return null;
   }
 
-  function logout() {
-    window.localStorage.removeItem(SESSION_KEY);
+  async function resetPassword(email: string) {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail.includes('@')) return 'Informe um e-mail valido.';
+
+    const redirectTo = typeof window === 'undefined' ? undefined : `${window.location.origin}/auth?mode=reset-password`;
+    const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, { redirectTo });
+
+    return error ? error.message : null;
+  }
+
+  async function updatePassword(password: string) {
+    if (password.length < 6) return 'A senha deve ter pelo menos 6 caracteres.';
+
+    const { error } = await supabase.auth.updateUser({ password });
+    return error ? error.message : null;
+  }
+
+  async function logout() {
+    await supabase.auth.signOut({ scope: 'global' });
     setUser(null);
   }
 
-  return <AuthContext.Provider value={{ user, isAuthenticated: Boolean(user), login, signup, logout }}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={{ user, isLoading, isAuthenticated: Boolean(user), login, signup, resetPassword, updatePassword, logout }}>
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
 export function useAuth() {

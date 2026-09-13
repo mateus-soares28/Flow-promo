@@ -27,11 +27,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <AccountProvider>
-          <AuthProvider>
+        <AuthProvider>
+          <AccountProvider>
             <AuthGuard>{children}</AuthGuard>
-          </AuthProvider>
-        </AccountProvider>
+          </AccountProvider>
+        </AuthProvider>
       </body>
     </html>
   );

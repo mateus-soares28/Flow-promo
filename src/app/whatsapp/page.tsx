@@ -24,17 +24,17 @@ export default function WhatsAppConnectionPage() {
   const [isGeneratingQr, setIsGeneratingQr] = useState(false);
   const [feedback, setFeedback] = useState('');
   const router = useRouter();
-  const { whatsappConnected, connectWhatsApp, disconnectWhatsApp } = useAccount();
+  const { whatsappConnected, connectWhatsApp, disconnectWhatsApp, saveWhatsAppConnection } = useAccount();
 
-  function saveConnectionName() {
+  async function saveConnectionName() {
     const name = connectionName.trim();
     if (!name) {
       setFeedback('Digite um nome para salvar a conexão.');
       return;
     }
 
-    window.localStorage.setItem('flowpromos-whatsapp-name', name);
-    setFeedback('Nome da conexão salvo.');
+    const message = await saveWhatsAppConnection(name);
+    setFeedback(message ?? 'Nome da conexão salvo.');
   }
 
   async function generateQrCode() {
@@ -229,13 +229,13 @@ export default function WhatsAppConnectionPage() {
 
                   <button
                     type="button"
-                    onClick={whatsappConnected ? disconnectWhatsApp : connectWhatsApp}
+                    onClick={() => { void (whatsappConnected ? disconnectWhatsApp() : connectWhatsApp()); }}
                     className={`w-full px-4 py-3 rounded-xl font-medium transition-colors ${whatsappConnected ? 'bg-red-50 text-red-700 hover:bg-red-100' : 'bg-green-600 text-white hover:bg-green-700'}`}
                   >
                     {whatsappConnected ? 'Desconectar WhatsApp' : 'Confirmar conexão'}
                   </button>
                   
-                  <button type="button" onClick={() => { disconnectWhatsApp(); router.push('/'); }} className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gray-50 border border-gray-200 text-gray-700 rounded-xl font-medium hover:bg-gray-100 transition-colors">
+                  <button type="button" onClick={() => { void disconnectWhatsApp(); router.push('/'); }} className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gray-50 border border-gray-200 text-gray-700 rounded-xl font-medium hover:bg-gray-100 transition-colors">
                     <LogOut size={18} className="text-gray-700" />
                     Logout / Voltar
                   </button>
