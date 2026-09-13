@@ -61,7 +61,10 @@ export type Database = {
           id: string;
           user_id: string;
           plan_id: 'full' | 'pro' | 'annual';
-          status: 'active' | 'expired' | 'canceled';
+          status: 'active' | 'pending' | 'expired' | 'canceled';
+          stripe_customer_id: string | null;
+          stripe_subscription_id: string | null;
+          stripe_checkout_session_id: string | null;
           started_at: string;
           expires_at: string;
           created_at: string;
@@ -71,7 +74,10 @@ export type Database = {
           id?: string;
           user_id: string;
           plan_id: 'full' | 'pro' | 'annual';
-          status?: 'active' | 'expired' | 'canceled';
+          status?: 'active' | 'pending' | 'expired' | 'canceled';
+          stripe_customer_id?: string | null;
+          stripe_subscription_id?: string | null;
+          stripe_checkout_session_id?: string | null;
           started_at?: string;
           expires_at: string;
           created_at?: string;
@@ -79,7 +85,10 @@ export type Database = {
         };
         Update: {
           plan_id?: 'full' | 'pro' | 'annual';
-          status?: 'active' | 'expired' | 'canceled';
+          status?: 'active' | 'pending' | 'expired' | 'canceled';
+          stripe_customer_id?: string | null;
+          stripe_subscription_id?: string | null;
+          stripe_checkout_session_id?: string | null;
           started_at?: string;
           expires_at?: string;
           updated_at?: string;
@@ -182,7 +191,7 @@ export type Database = {
     Functions: Record<string, never>;
     Enums: {
       app_role: 'user' | 'admin';
-      subscription_status: 'active' | 'expired' | 'canceled';
+      subscription_status: 'active' | 'pending' | 'expired' | 'canceled';
       whatsapp_connection_status: 'connected' | 'disconnected' | 'pending';
       dispatch_status: 'scheduled' | 'sent' | 'failed' | 'canceled';
     };

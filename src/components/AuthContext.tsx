@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { createSupabaseBrowserClient } from '@/src/lib/supabase/client';
 
@@ -9,12 +9,14 @@ interface AppUser {
   name: string;
   email: string;
   planId: string;
+  role: 'user' | 'admin';
 }
 
 interface AuthContextValue {
   user: AppUser | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  isAccessGranted: boolean;
   login: (email: string, password: string) => Promise<string | null>;
   signup: (name: string, email: string, password: string, planId: string, purchaseConfirmed: boolean) => Promise<string | null>;
   resetPassword: (email: string) => Promise<string | null>;
@@ -29,6 +31,7 @@ function toAppUser(user: User | null): AppUser | null {
     email: user.email,
     name: typeof user.user_metadata.full_name === 'string' ? user.user_metadata.full_name : user.email,
     planId: typeof user.user_metadata.plan_id === 'string' ? user.user_metadata.plan_id : 'full',
+    role: 'user',
   };
 }
 
@@ -38,26 +41,58 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [user, setUser] = useState<AppUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isAccessGranted, setIsAccessGranted] = useState(false);
+
+  const syncAuthUser = useCallback(async (authUser: User | null) => {
+    const appUser = toAppUser(authUser);
+    setUser(appUser);
+    if (!appUser) {
+      setIsAccessGranted(false);
+      setIsLoading(false);
+      return;
+    }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', appUser.id)
+      .maybeSingle();
+    const isAdmin = profile?.role === 'admin';
+    setUser({ ...appUser, role: isAdmin ? 'admin' : 'user' });
+    if (isAdmin) {
+      setIsAccessGranted(true);
+      setIsLoading(false);
+      return;
+    }
+
+    const { data } = await supabase
+      .from('subscriptions')
+      .select('status, expires_at')
+      .eq('user_id', appUser.id)
+      .eq('status', 'active')
+      .gt('expires_at', new Date().toISOString())
+      .limit(1)
+      .maybeSingle();
+    setIsAccessGranted(Boolean(data));
+    setIsLoading(false);
+  }, [supabase]);
 
   useEffect(() => {
     let active = true;
 
     supabase.auth.getUser().then(({ data }) => {
-      if (!active) return;
-      setUser(toAppUser(data.user));
-      setIsLoading(false);
+      if (active) void syncAuthUser(data.user);
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(toAppUser(session?.user ?? null));
-      setIsLoading(false);
+      if (active) void syncAuthUser(session?.user ?? null);
     });
 
     return () => {
       active = false;
       listener.subscription.unsubscribe();
     };
-  }, [supabase]);
+  }, [supabase, syncAuthUser]);
 
   async function login(email: string, password: string) {
     const { error } = await supabase.auth.signInWithPassword({
@@ -115,7 +150,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, isAuthenticated: Boolean(user), login, signup, resetPassword, updatePassword, logout }}>
+    <AuthContext.Provider value={{ user, isLoading, isAuthenticated: Boolean(user), isAccessGranted, login, signup, resetPassword, updatePassword, logout }}>
       {children}
     </AuthContext.Provider>
   );
